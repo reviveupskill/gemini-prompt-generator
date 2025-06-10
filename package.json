@@ -1,0 +1,16 @@
+   ```json
+    {
+      "name": "gemini-prompt-generator",
+      "version": "1.0.0",
+      "private": true,
+      "main": "api/generate.js",
+      "scripts": {
+        "start": "node api/generate.js"
+      },
+      "dependencies": {
+        "@google/generative-ai": "^0.11.0", // এটি লেটেস্ট ভার্সন। Vercel এর জন্য এটি জরুরি।
+        "formidable": "^3.5.1" // এটিও লেটেস্ট ভার্সন।
+      }
+    }
+    ```
+    **গুরুত্বপূর্ণ নোট:** `^0.11.0` এবং `^3.5.1` হলো নির্দিষ্ট ভার্সন। আপনি যখন কাজটি করছেন, তখন `@google/generative-ai` এবং `formidable` এর লেটেস্ট স্টেবল ভার্সন ব্যবহার করতে পারেন। লেটেস্ট ভার্সন খুঁজতে [npmjs.com/package/formidable](https://npmjs.com/package/formidable) এবং [npmjs.com/package/@google/generative-ai](https://npmjs.com/package/@google/generative-ai) ভিজিট করতে পারেন।
