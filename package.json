@@ -1,4 +1,3 @@
-```json
 {
   "name": "gemini-prompt-generator",
   "version": "1.0.0",
@@ -8,8 +7,7 @@
     "start": "node api/generate.js"
   },
   "dependencies": {
-    "@google-cloud/vertexai": "^0.4.0", // আপনার লেটেস্ট ভার্সন দিন
+    "@google-cloud/vertexai": "^0.4.0",
     "formidable": "^3.5.1"
   }
 }
-```
