@@ -1,0 +1,37 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Prompt Generator</title>
+    <link rel="stylesheet" href="style.css">
+</head>
+<body>
+    <div class="container">
+        <h1 class="main-title">Prompt Generator</h1>
+
+        <div class="input-area">
+            <label for="textInput" class="input-label">Enter Text:</label>
+            <textarea id="textInput" class="input-box" placeholder="Enter text here (Bangla & English supported)"></textarea>
+
+            <label for="imageInput" class="input-label">Upload Photo (Optional):</label>
+            <input type="file" id="imageInput" class="file-upload-input">
+
+            <button id="deleteInputBtn" class="delete-btn">Delete Input</button>
+        </div>
+
+        <button id="generateBtn" class="generate-button">Generate Prompt</button>
+
+        <div class="output-area">
+            <h2 class="output-title">Generated Prompt:</h2>
+            <div id="outputBox" class="output-box"></div>
+            <button id="copyOutputBtn" class="copy-btn">Copy</button>
+        </div>
+    </div>
+
+    <div id="loadingIndicator" class="loading-indicator">Generating Prompt...</div>
+    <div id="errorDisplay" class="error-display"></div>
+
+    <script src="script.js"></script>
+</body>
+</html>
