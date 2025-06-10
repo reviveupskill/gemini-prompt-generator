@@ -1,1 +1,18 @@
-json { "name": "gemini-prompt-generator", "version": "1.0.0", "private": true, "main": "api/generate.js", "scripts": { "start": "node api/generate.js" }, "dependencies": { "@google-cloud/vertexai": "^0.4.0", "formidable": "^3.5.1" }, "engines": { "node": "18.x" } }
+```json
+{
+  "name": "gemini-prompt-generator",
+  "version": "1.0.0",
+  "private": true,
+  "main": "api/generate.js",
+  "scripts": {
+    "start": "node api/generate.js"
+  },
+  "dependencies": {
+    "@google-cloud/vertexai": "^0.4.0",
+    "formidable": "^3.5.1"
+  },
+  "engines": {
+    "node": "18.x" // Node.js 18.x বা "20.x" ব্যবহার করুন। Vercel Node.js 20.x সমর্থন করে।
+  }
+}
+```
