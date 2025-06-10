@@ -1,18 +1,43 @@
-import { GoogleGenerativeAI } from '@google/generative-ai';
+```javascript
+// api/generate.js (Vertex AI এর জন্য পরিবর্তিত কোড)
+import { VertexAI } from '@google-cloud/vertexai'; // নতুন SDK ইম্পোর্ট
+
+// formidable ফাইল আপলোড হ্যান্ডলিং এর জন্য
 import formidable from 'formidable';
-import fs from 'fs';
+import fs from 'fs'; // টেম্পোরারি ফাইল ডিলিট করার জন্য
 
 export const config = {
     api: {
-        bodyParser: false, // Important for handling file uploads
+        bodyParser: false, // ফাইল আপলোড হ্যান্ডলিং এর জন্য এটি জরুরি
     },
 };
 
-async function handleImagePrompt(imagePath, textPrompt) {
-    // Implement logic to extract information from the image and combine with text
-    // This might involve using other Google Cloud Vision API or similar services.
-    // For this basic example, we'll just return a placeholder.
-    return `Prompt based on image and text: [Details from image] + "${textPrompt}"`;
+// আপনার Google Cloud Project ID এবং Region এখানে সেট করুন
+// এই ভ্যারিয়েবলগুলো Vercel Environment Variables থেকে আসবে
+const projectId = process.env.GCP_PROJECT_ID;
+const location = process.env.GCP_LOCATION || 'us-central1'; // আপনার মডেলের রিজিওন। যেমন: us-central1, asia-southeast1
+
+// Vertex AI ক্লায়েন্ট ইনিশিয়ালাইজ করুন
+const vertex_ai = new VertexAI({ project: projectId, location: location });
+
+// জেমিনি প্রো (টেক্সট-ওনলি) মডেল
+const textModel = vertex_ai.getGenerativeModel({
+  model: 'gemini-pro',
+  // কনফিগারেশন যদি প্রয়োজন হয়
+  // generation_config: { maxOutputTokens: 2048 },
+});
+
+// জেমিনি প্রো ভিশন (মাল্টিমোডাল) মডেল
+const visionModel = vertex_ai.getGenerativeModel({
+  model: 'gemini-pro-vision',
+  // কনফিগারেশন যদি প্রয়োজন হয়
+  // generation_config: { maxOutputTokens: 2048 },
+});
+
+// ইমেজকে Base64 এনকোড করার জন্য হেল্পার ফাংশন
+function imageToBase64(imagePath) {
+  const imageBuffer = fs.readFileSync(imagePath);
+  return imageBuffer.toString('base64');
 }
 
 export default async function handler(req, res) {
@@ -20,7 +45,7 @@ export default async function handler(req, res) {
         return res.status(405).json({ message: 'Only POST requests allowed' });
     }
 
-    const form = formidable({ multiples: false });
+    const form = formidable({ multiples: false, keepExtensions: true }); // ফাইল টাইপ ধরে রাখার জন্য keepExtensions: true
 
     form.parse(req, async (err, fields, files) => {
         if (err) {
@@ -28,32 +53,62 @@ export default async function handler(req, res) {
             return res.status(500).json({ message: 'Error processing the request.' });
         }
 
-        const { text } = fields;
-        const imageFile = files.image;
+        // formidable fields একটি Array হতে পারে, তাই প্রথম উপাদানটি নিন
+        const text = Array.isArray(fields.text) ? fields.text[0] : fields.text;
+        const imageFile = Array.isArray(files.image) ? files.image[0] : files.image;
         let generatedText = '';
 
         try {
-            const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY);
-            const model = genAI.getGenerativeModel({ model: "gemini-pro" });
+            const requestParts = [];
 
-            if (imageFile) {
-                // Basic handling - in a real application, you'd process the image
-                const imagePath = imageFile.filepath;
-                generatedText = await handleImagePrompt(imagePath, text || '');
-                fs.unlinkSync(imagePath); // Clean up temporary file
-            } else if (text) {
-                const result = await model.generateContent(text);
-                const response = await result.response;
-                generatedText = response.text();
-            } else {
+            if (text && text.trim() !== '') { // টেক্সট ইনপুট থাকলে
+              requestParts.push({ text: text });
+            }
+
+            if (imageFile) { // ইমেজ ইনপুট থাকলে
+                const base64Image = imageToBase64(imageFile.filepath);
+                requestParts.push({
+                  inlineData: {
+                    mimeType: imageFile.mimetype, // ফাইলের সঠিক MIME টাইপ
+                    data: base64Image,
+                  },
+                });
+                // টেম্পোরারি ফাইল মুছে ফেলুন
+                fs.unlinkSync(imageFile.filepath);
+            }
+
+            // যদি কোন ইনপুট না থাকে
+            if (requestParts.length === 0) {
                 return res.status(400).json({ message: 'Please provide text or an image.' });
+            }
+
+            let modelToUse;
+            if (imageFile) {
+              modelToUse = visionModel; // ইমেজ থাকলে ভিশন মডেল ব্যবহার করুন
+            } else {
+              modelToUse = textModel; // শুধু টেক্সট থাকলে টেক্সট মডেল ব্যবহার করুন
+            }
+
+            // জেমিনি মডেল কল করুন
+            const result = await modelToUse.generateContent({ contents: [{ parts: requestParts }] });
+            const response = result.response;
+
+            // নিশ্চিত করুন যে কন্টেন্ট এবং পার্টস বিদ্যমান
+            if (response.candidates && response.candidates.length > 0 &&
+                response.candidates[0].content && response.candidates[0].content.parts &&
+                response.candidates[0].content.parts.length > 0 &&
+                response.candidates[0].content.parts[0].text) {
+                generatedText = response.candidates[0].content.parts[0].text;
+            } else {
+                generatedText = 'No content generated by the model.';
             }
 
             res.status(200).json({ generatedText });
 
         } catch (error) {
-            console.error('Gemini API Error:', error);
+            console.error('Vertex AI API Error:', error);
             res.status(500).json({ message: 'Failed to generate content.', error: error.message });
         }
     });
 }
+```
