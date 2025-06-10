@@ -1,81 +1,96 @@
-const textInput = document.getElementById('textInput');
-const imageInput = document.getElementById('imageInput');
-const generateBtn = document.getElementById('generateBtn');
-const outputBox = document.getElementById('outputBox');
-const copyOutputBtn = document.getElementById('copyOutputBtn');
-const deleteInputBtn = document.getElementById('deleteInputBtn');
-const loadingIndicator = document.getElementById('loadingIndicator');
-const errorDisplay = document.getElementById('errorDisplay');
+```javascript
+import { VertexAI } from '@google-cloud/vertexai';
+import formidable from 'formidable';
+import fs from 'fs';
 
-async function generatePrompt() {
-    const text = textInput.value.trim();
-    const imageFile = imageInput.files.length > 0 ? imageInput.files [0] : null;
+export const config = {
+    api: {
+        bodyParser: false,
+    },
+};
 
-    if (!text && !imageFile) {
-        outputBox.textContent = 'Please enter text or upload an image.';
-        return;
-    }
+const projectId = process.env.GCP_PROJECT_ID;
+const location = process.env.GCP_LOCATION || 'us-central1';
 
-    loadingIndicator.style.display = 'block';
-    outputBox.textContent = '';
-    errorDisplay.style.display = 'none';
+const vertex_ai = new VertexAI({ project: projectId, location: location });
 
-    const formData = new FormData();
-    formData.append('text', text);
-    if (imageFile) {
-        formData.append('image', imageFile);
-    }
+const textModel = vertex_ai.getGenerativeModel({
+  model: 'gemini-pro',
+});
 
-    try {
-        const response = await fetch('/api/generate', { // Vercel API endpoint
-            method: 'POST',
-            body: formData, // Send as multipart/form-data
-        });
+const visionModel = vertex_ai.getGenerativeModel({
+  model: 'gemini-pro-vision',
+});
 
-        if (!response.ok) {
-            const errorData = await response.json();
-            throw new Error(errorData.message || 'Failed to generate prompt.');
-        }
-
-        const data = await response.json();
-        outputBox.textContent = data.generatedText;
-
-    } catch (error) {
-        console.error('Error generating prompt:', error);
-        errorDisplay.textContent = `Error: ${error.message}`;
-        errorDisplay.style.display = 'block';
-    } finally {
-        loadingIndicator.style.display = 'none';
-    }
+function imageToBase64(imagePath) {
+  const imageBuffer = fs.readFileSync(imagePath);
+  return imageBuffer.toString('base64');
 }
 
-generateBtn.addEventListener('click', generatePrompt);
+export default async function handler(req, res) {
+    if (req.method !== 'POST') {
+        return res.status(405).json({ message: 'Only POST requests allowed' });
+    }
 
-copyOutputBtn.addEventListener('click', () => {
-    const textToCopy = outputBox.textContent;
-    navigator.clipboard.writeText(textToCopy).then(() => {
-        alert('Prompt copied to clipboard!');
-    }).catch(err => {
-        console.error('Failed to copy text: ', err);
-        alert('Failed to copy text.');
+    const form = formidable({ multiples: false, keepExtensions: true });
+
+    form.parse(req, async (err, fields, files) => {
+        if (err) {
+            console.error('Form parsing error:', err);
+            return res.status(500).json({ message: 'Error processing the request.' });
+        }
+
+        const text = Array.isArray(fields.text) ? fields.text[0] : fields.text;
+        const imageFile = Array.isArray(files.image) ? files.image[0] : files.image;
+        let generatedText = '';
+
+        try {
+            const requestParts = [];
+
+            if (text && text.trim() !== '') {
+              requestParts.push({ text: text });
+            }
+
+            if (imageFile) {
+                const base64Image = imageToBase64(imageFile.filepath);
+                requestParts.push({
+                  inlineData: {
+                    mimeType: imageFile.mimetype,
+                    data: base664Image,
+                  },
+                });
+                fs.unlinkSync(imageFile.filepath);
+            }
+
+            if (requestParts.length === 0) {
+                return res.status(400).json({ message: 'Please provide text or an image.' });
+            }
+
+            let modelToUse;
+            if (imageFile) {
+              modelToUse = visionModel;
+            } else {
+              modelToUse = textModel;
+            }
+
+            const result = await modelToUse.generateContent({ contents: [{ parts: requestParts }] });
+            const response = result.response;
+
+            if (response.candidates && response.candidates.length > 0 &&
+                response.candidates[0].content && response.candidates[0].content.parts &&
+                response.candidates[0].content.parts.length > 0 &&
+                response.candidates[0].content.parts[0].text) {
+                generatedText = response.candidates[0].content.parts[0].text;
+            } else {
+                generatedText = 'No content generated by the model.';
+            }
+
+            res.status(200).json({ generatedText });
+
+        } catch (error) {
+            console.error('Vertex AI API Error:', error);
+            res.status(500).json({ message: 'Failed to generate content.', error: error.message });
+        }
     });
-});
-
-deleteInputBtn.addEventListener('click', () => {
-    textInput.value = '';
-    imageInput.value = ''; // Clear file input
-    outputBox.textContent = '';
-});
-
-textInput.addEventListener('input', () => {
-    if (textInput.value.trim() === '' && imageInput.files.length === 0) {
-        outputBox.textContent = '';
-    }
-});
-
-
-imageInput.addEventListener('change', () => {
-    if (textInput.value.trim() === '' && imageInput.files.length === 0) {
-        outputBox.textContent = '';
-    }
-});
+}
+```
