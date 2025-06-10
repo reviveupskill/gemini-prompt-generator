@@ -12,7 +12,7 @@
     "formidable": "^3.5.1"
   },
   "engines": {
-    "node": "18.x" // Node.js 18.x বা "20.x" ব্যবহার করুন। Vercel Node.js 20.x সমর্থন করে।
+    "node": "18.x"
   }
 }
 ```
