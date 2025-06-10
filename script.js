@@ -73,6 +73,7 @@ textInput.addEventListener('input', () => {
     }
 });
 
+
 imageInput.addEventListener('change', () => {
     if (textInput.value.trim() === '' && imageInput.files.length === 0) {
         outputBox.textContent = '';
